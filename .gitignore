@@ -18,3 +18,8 @@ docs/
 .env
 .env.*
 !.env.example
+
+# Editor swap files
+*.swp
+*.swo
+*~
