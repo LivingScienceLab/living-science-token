@@ -23,3 +23,6 @@ docs/
 *.swp
 *.swo
 *~
+
+# Real distribution config (keep recipient lists out of git)
+distribution.json

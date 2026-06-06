@@ -6,6 +6,11 @@ solc = "0.8.24"
 evm_version = "cancun"
 optimizer = true
 optimizer_runs = 200
+# Allow the distribution script to read its JSON config (scoped to those files only).
+fs_permissions = [
+    { access = "read", path = "./distribution.json" },
+    { access = "read", path = "./distribution.example.json" },
+]
 # Verify deployed bytecode against source on Etherscan after deploy.
 # Set ETHERSCAN_API_KEY in your environment to enable `--verify`.
 

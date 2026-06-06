@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy this to distribution.json and fill in real values. amountsTokens are WHOLE LSL (not wei); the script multiplies by 1e18. recipients[] and amountsTokens[] must be the same length. distribution.json is gitignored so real recipient lists are not committed by accident.",
+  "recipients": [
+    "0x0000000000000000000000000000000000000001",
+    "0x0000000000000000000000000000000000000002"
+  ],
+  "amountsTokens": [
+    100000,
+    50000
+  ]
+}
