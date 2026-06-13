@@ -21,7 +21,9 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
   Address is stored in `.env` as `LSL_DISPERSE_ADDRESS`; set it as env `LSL_DISPERSE` for `DisperseBatch`.
 - **LSLAccessGate** (spend-to-access): **`0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5`** — Etherscan-verified
   (deployed 2026-06-13). SINK=Treasury, treasury=owner=Ledger `0x7C9e…Bc1a`. Deploy tx
-  `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831. No resources set yet.
+  `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831.
+  Resource set (2026-06-13): **`research-access`** = Subscription, 50 LSL / 30 days, active
+  (tx `0x279f8e40c6f49d548719c86720e40d8eb8c1aa694ba0cf66579cabb982dd0106`).
 
 ## DONE ✅
 - [x] Contract `src/LivingScienceToken.sol` + tests (22 passing) + Slither (0 findings)
@@ -60,9 +62,9 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       owner = Ledger `0x7C9e…Bc1a`. Deploy tx
       `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831, 1,326,002 gas.
       Securities counsel cleared the spend-to-access model for mainnet (per user 2026-06-13). Address in
-      `.env` as `LSL_ACCESS_GATE_ADDRESS`. NOTE: deployed with NO resources configured yet — `setResource`
-      (owner-only) must be called before anyone can purchase access; `sink`/`treasury` are runtime-changeable
-      via `setSink`.
+      `.env` as `LSL_ACCESS_GATE_ADDRESS`. First resource configured 2026-06-13: **`research-access`** =
+      Subscription, 50 LSL / 30 days, active. Add/update more via `setResource`; `sink`/`treasury` are
+      runtime-changeable via `setSink`.
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
