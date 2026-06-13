@@ -1,6 +1,6 @@
 # CHECKPOINT — Living Science Token (LSL)
 
-_Saved 2026-06-06. Resume from the "NEXT ACTION" section._
+_Saved 2026-06-06; updated 2026-06-12 (LSLDisperse deployed to mainnet). Resume from the "NEXT ACTION" section._
 
 ## What this project is
 A fixed-supply ERC-20 token, **deployed to Ethereum mainnet**, signed by a **Ledger**
@@ -11,10 +11,14 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
 - Built on OpenZeppelin v5.6.1, Foundry.
 
 ## On-chain facts (mainnet)
-- Contract: **`0xe1Eb0f66a15b80f64CA252fbe0CA3087F74A9B08`** — Etherscan-verified.
+- LSL token: **`0xe1Eb0f66a15b80f64CA252fbe0CA3087F74A9B08`** — Etherscan-verified.
 - Deploy tx: `0xa67cb272e3be97dc4dcf667ae81deff9442915707ad214445ef2770d2b2f20e2`.
 - Deployer / holder of full 1,000,000 supply: Ledger **`0x7C9eF832417e63F805ccaAbD131741aceEB5Bc1a`**
   (Foundry default path `m/44'/60'/0'/0/0`).
+- **LSLDisperse** batch helper: **`0x2d6fEC5f0d3611Ec9BFe7b633bD180B49d17Fcdd`** — Etherscan-verified
+  (deployed + verified 2026-06-12). Deploy tx
+  `0x9ecf3fb12ef8023c8cece1ed74491734fbb49081bba62593a7a765eca0094ade`, block 25305047, 235,364 gas.
+  Address is stored in `.env` as `LSL_DISPERSE_ADDRESS`; set it as env `LSL_DISPERSE` for `DisperseBatch`.
 
 ## DONE ✅
 - [x] Contract `src/LivingScienceToken.sol` + tests (22 passing) + Slither (0 findings)
@@ -25,6 +29,12 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
 - [x] **Mainnet deploy + Etherscan verification** (see on-chain facts above)
 - [x] Distribution tooling: `script/Distribute.s.sol` + gated `scripts/distribute.sh`
       (simulate-first, Ledger-signed); template `distribution.example.json`
+- [x] Single-batch distribution path: `src/LSLDisperse.sol` (stateless/ownerless atomic batch
+      helper, 8 tests) + `script/DeployDisperse.s.sol` + `script/DisperseBatch.s.sol` + gated
+      `scripts/disperse.sh` — fans out in one tx (2 Ledger sigs total, not N).
+      **Deployed + Etherscan-verified on mainnet 2026-06-12** at
+      `0x2d6fEC5f0d3611Ec9BFe7b633bD180B49d17Fcdd`. NOTE: deployed straight to mainnet without the
+      usual Sepolia rehearsal, at the user's explicit instruction.
 - [x] `LEGAL-TAX-CHECKLIST.md` — topics to take to securities counsel + tax pro
 
 ## NOT done / current frontier ⏳
@@ -32,7 +42,10 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       The entire supply still sits on the single Ledger address; nothing is sold or traded.
 - [ ] **Legal/tax engagement open** — per `LEGAL-TAX-CHECKLIST.md`, decide distribution model
       + entity + counsel review *before* moving any tokens.
-- [ ] Open custody question: keep supply on single Ledger key, or migrate to a **multisig (Safe)**.
+- [x] **Custody decided (2026-06-06): supply stays on the single Ledger key** — no Safe/multisig
+      migration. Makes the offline seed-phrase backup the critical single point of failure.
+- [x] **LSLDisperse verified on Etherscan (2026-06-12)** — done with a fresh V2 API key (the old V1
+      key was rejected by Etherscan's V2 API; `.env` now holds a working V2 key).
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
@@ -43,9 +56,10 @@ Distribution is gated on legal/tax, not on code. The tooling is ready; the block
 3. Preserve every distribution tx + date + FMV for tax records (`broadcast/` is the audit trail).
 
 ## OPEN QUESTIONS for the user
-- Is the Ledger **24-word seed phrase backed up offline**?
-- Supply stays on the **single Ledger address**, or move to a **multisig (Safe)**?
-- Is **Living Science Lab** a formed entity that should hold/issue the token (vs. personally)?
+- ~~Is the Ledger 24-word seed phrase backed up offline?~~ **CONFIRMED: yes, backed up offline (2026-06-06).**
+- ~~Supply stays on the single Ledger address, or move to a multisig (Safe)?~~ **DECIDED: single Ledger key (2026-06-06).**
+- Issuing entity: still to be decided with securities counsel. "Living Science Lab" is a brand/project name,
+  not a separate legal entity.
 
 ## Tooling locations (this machine)
 - Foundry (forge/cast/anvil): `~/.config/.foundry/bin/` (add to PATH)
