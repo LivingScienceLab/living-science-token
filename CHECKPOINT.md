@@ -24,6 +24,11 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
   `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831.
   Resource set (2026-06-13): **`research-access`** = Subscription, 50 LSL / 30 days, active
   (tx `0x279f8e40c6f49d548719c86720e40d8eb8c1aa694ba0cf66579cabb982dd0106`).
+  **Resource ID encoding:** the `bytes32 id` is the **string `"research-access"` right-padded**
+  (`cast format-bytes32-string "research-access"` →
+  `0x72657365617263682d6163636573730000000000000000000000000000000000`), NOT `keccak256`. Use that
+  exact value for `resources()`, `setResourceActive()`, `purchase()`, etc.
+  Verified live on-chain 2026-06-13: all params stored correctly, gate unpaused, sink=Treasury → Ledger.
 
 ## DONE ✅
 - [x] Contract `src/LivingScienceToken.sol` + tests (22 passing) + Slither (0 findings)
@@ -43,8 +48,19 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
 - [x] `LEGAL-TAX-CHECKLIST.md` — topics to take to securities counsel + tax pro
 
 ## NOT done / current frontier ⏳
-- [ ] **Distribution not started** — no `distribution.json` exists yet (only the example).
-      The entire supply still sits on the single Ledger address; nothing is sold or traded.
+- [x] **Distribution pipeline proven end-to-end on mainnet (2026-06-13, live self-test)** — used the
+      Ledger's **index-1** address (`m/44'/60'/0'/0/1` = `0x0a78378b424a19DC752bB99d2802521E8DD0C590`)
+      as a stand-in recipient and ran the full real flow: signed the control-of-address proof from index 1,
+      `cast wallet verify` ✅ (plus a negative control against index 0 that correctly REJECTED), then sent a
+      **1 LSL** test transfer from index 0 — tx
+      `0x34cdd7b695817aafa9188ad597bdfaa630cd8a432d490c910eb64293f928910b` (block 25311983), recipient
+      balance confirmed 1 LSL, totalSupply unchanged. The mechanics (derive → sign → verify → send → confirm)
+      are validated; real distribution now only needs real verified recipients. The 1 LSL test was then
+      **swept back to index 0** (fund-gas tx `0xbb9e5eda…6b317f`, sweep tx `0xd96b55db…85b1cb0d9`), so the
+      full 1,000,000 supply is reconsolidated on index 0; a ~0.0000262 ETH gas dust remains on index 1
+      (same seed, recoverable).
+- [ ] **Distribution to real recipients not started** — no `distribution.json` exists yet (only the example).
+      The full supply sits on the single Ledger (index 0); nothing sold or traded externally.
 - [ ] **Legal/tax engagement open** — per `LEGAL-TAX-CHECKLIST.md`, decide distribution model
       + entity + counsel review *before* moving any tokens.
 - [x] **Custody decided (2026-06-06): supply stays on the single Ledger key** — no Safe/multisig
