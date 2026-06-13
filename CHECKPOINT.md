@@ -1,6 +1,6 @@
 # CHECKPOINT — Living Science Token (LSL)
 
-_Saved 2026-06-06; updated 2026-06-12 (LSLDisperse deployed to mainnet). Resume from the "NEXT ACTION" section._
+_Saved 2026-06-06; updated 2026-06-13 (LSLDisperse + LSLAccessGate deployed to mainnet). Resume from the "NEXT ACTION" section._
 
 ## What this project is
 A fixed-supply ERC-20 token, **deployed to Ethereum mainnet**, signed by a **Ledger**
@@ -19,6 +19,9 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
   (deployed + verified 2026-06-12). Deploy tx
   `0x9ecf3fb12ef8023c8cece1ed74491734fbb49081bba62593a7a765eca0094ade`, block 25305047, 235,364 gas.
   Address is stored in `.env` as `LSL_DISPERSE_ADDRESS`; set it as env `LSL_DISPERSE` for `DisperseBatch`.
+- **LSLAccessGate** (spend-to-access): **`0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5`** — Etherscan-verified
+  (deployed 2026-06-13). SINK=Treasury, treasury=owner=Ledger `0x7C9e…Bc1a`. Deploy tx
+  `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831. No resources set yet.
 
 ## DONE ✅
 - [x] Contract `src/LivingScienceToken.sol` + tests (22 passing) + Slither (0 findings)
@@ -46,6 +49,20 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       migration. Makes the offline seed-phrase backup the critical single point of failure.
 - [x] **LSLDisperse verified on Etherscan (2026-06-12)** — done with a fresh V2 API key (the old V1
       key was rejected by Etherscan's V2 API; `.env` now holds a working V2 key).
+- [x] **LSLAccessGate FULL Sepolia rehearsal passed (2026-06-13)** — deployed + Etherscan-verified at
+      `0x4b33B297A8C9AdFca97D9aEF980102D4ef9613F3` (Sepolia), then exercised end-to-end per
+      `ACCESSGATE-SEPOLIA-REHEARSAL.md`: setResource (PerUse + Subscription), setOperator, purchase
+      (both models), consume (credits decrement + access revokes at 0), BOTH sinks (Treasury routing +
+      Burn → totalSupply dropped 3 LSL), pause/unpause, setResourceActive. Not exercised: purchaseWithPermit
+      (used plain approve+purchase fallback) and the non-operator consume revert (covered by unit tests).
+- [x] **AccessGate DEPLOYED + Etherscan-verified on mainnet (2026-06-13)** at
+      `0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5`. Launch params: **SINK=0 (Treasury)**, treasury =
+      owner = Ledger `0x7C9e…Bc1a`. Deploy tx
+      `0xeeb75d87029f94664ecf0828f69d290343b0571594d69695026b496e1ee0d00f`, block 25306831, 1,326,002 gas.
+      Securities counsel cleared the spend-to-access model for mainnet (per user 2026-06-13). Address in
+      `.env` as `LSL_ACCESS_GATE_ADDRESS`. NOTE: deployed with NO resources configured yet — `setResource`
+      (owner-only) must be called before anyone can purchase access; `sink`/`treasury` are runtime-changeable
+      via `setSink`.
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
