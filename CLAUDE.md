@@ -23,6 +23,7 @@ forge test --match-contract LivingScienceTokenTest    # run one test contract
 forge fmt --check                 # formatting gate — CI fails if this fails; run `forge fmt` to fix
 forge snapshot                    # regenerate .gas-snapshot
 slither .                         # static analysis (~/.slither-venv/bin/slither); expected: 0 findings
+scripts/distribute.sh sepolia     # rehearse a batch distribution (dry run, then Ledger-signed) — see Distribution
 ```
 
 CI (`.github/workflows/test.yml`) runs, in order: `forge fmt --check` → `forge build --sizes`
@@ -59,6 +60,46 @@ any `--sender`; add `--rpc-url <net>` to simulate against live chain state and e
 notably the permit revert/replay paths and `DOMAIN_SEPARATOR` / event assertions. The
 `test_SupplyNeverIncreases` test encodes the core invariant. If you change the contract, these
 tests are the contract of record; keep them green and extend them rather than weakening asserts.
+
+## Distribution (post-deploy, mirrors the deploy's simulate-first pattern)
+
+Moving tokens off the deployer Ledger uses `script/Distribute.s.sol` (batch `IERC20.transfer`
+from the signer) driven by `scripts/distribute.sh`. It deliberately re-uses the deploy safety
+model: **always simulate against live chain state with a full preview before any signature.**
+
+- Recipients/amounts come from `distribution.json` (gitignored; copy `distribution.example.json`).
+  Override the path with env `DISTRIBUTION_FILE`. `amountsTokens` are **whole LSL, not wei** — the
+  script multiplies by `1e18`. `recipients[]` and `amountsTokens[]` must be equal length.
+- The script validates in *both* dry-run and broadcast: equal-length non-empty arrays, no
+  zero/self recipients, no zero amounts, and `total <= signer balance`; it prints a per-recipient
+  preview plus total and remaining balance.
+- Token address defaults to the deployed LSL `0xe1Eb0f66a15b80f64CA252fbe0CA3087F74A9B08`;
+  override with env `LSL_TOKEN` (e.g. to rehearse against a Sepolia mock).
+- `scripts/distribute.sh [network]` (default `mainnet`) runs the dry run, then prompts for an
+  explicit `yes` before the `--ledger --broadcast` step. Rehearse on `sepolia` first.
+- Distribution is **gated on the legal/tax decisions in `LEGAL-TAX-CHECKLIST.md`, not on code** —
+  the tooling is ready; do not initiate real transfers without explicit instruction. `broadcast/`
+  is the audit trail; preserve every distribution tx, date, and FMV for tax records.
+
+### Single-batch path via `LSLDisperse` (fewer signatures, atomic)
+
+For larger recipient lists there is a second, preferred path that fans out in **one** transaction
+instead of N. `src/LSLDisperse.sol` is a stateless, ownerless, no-custody helper: `disperse(token,
+recipients[], amounts[])` pulls each `amounts[i]` from the caller to `recipients[i]` via
+`transferFrom`, atomically (any failed leg reverts the whole batch, so a retry can never
+double-send). It holds no funds and has no privileged roles — it mirrors LSL's own trustless design.
+
+- Deploy it **once** with `script/DeployDisperse.s.sol` (Sepolia first, then mainnet, `--ledger
+  --verify`). Its address is *not* the deterministic LSL address — record the deployed address and
+  set it as env `LSL_DISPERSE`.
+- `script/DisperseBatch.s.sol` reads the **same** `distribution.json` (whole-LSL `amountsTokens`),
+  validates equal-length/non-empty/no zero-or-self/no-duplicate recipients and `total <= balance`,
+  prints a per-recipient preview, then broadcasts exactly two txs: `approve(disperser, total)` then
+  `disperse(...)`. Two Ledger confirmations regardless of recipient count.
+- `scripts/disperse.sh [network]` (default `mainnet`) is the gated wrapper: dry-run simulation
+  first, then prompts for `yes` before the `--ledger --broadcast --slow` step (`--slow` lets the
+  approve mine before the dependent disperse). Requires `LSL_DISPERSE` in `.env`/env. Rehearse on
+  `sepolia` first. Same legal/tax gating as above applies.
 
 ## Dependencies
 

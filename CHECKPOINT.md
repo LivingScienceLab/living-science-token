@@ -25,6 +25,9 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
 - [x] **Mainnet deploy + Etherscan verification** (see on-chain facts above)
 - [x] Distribution tooling: `script/Distribute.s.sol` + gated `scripts/distribute.sh`
       (simulate-first, Ledger-signed); template `distribution.example.json`
+- [x] Single-batch distribution path: `src/LSLDisperse.sol` (stateless/ownerless atomic batch
+      helper, 8 tests) + `script/DeployDisperse.s.sol` + `script/DisperseBatch.s.sol` + gated
+      `scripts/disperse.sh` — fans out in one tx (2 Ledger sigs total, not N). Not yet deployed.
 - [x] `LEGAL-TAX-CHECKLIST.md` — topics to take to securities counsel + tax pro
 
 ## NOT done / current frontier ⏳
@@ -32,7 +35,8 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       The entire supply still sits on the single Ledger address; nothing is sold or traded.
 - [ ] **Legal/tax engagement open** — per `LEGAL-TAX-CHECKLIST.md`, decide distribution model
       + entity + counsel review *before* moving any tokens.
-- [ ] Open custody question: keep supply on single Ledger key, or migrate to a **multisig (Safe)**.
+- [x] **Custody decided (2026-06-06): supply stays on the single Ledger key** — no Safe/multisig
+      migration. Makes the offline seed-phrase backup the critical single point of failure.
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
@@ -43,9 +47,10 @@ Distribution is gated on legal/tax, not on code. The tooling is ready; the block
 3. Preserve every distribution tx + date + FMV for tax records (`broadcast/` is the audit trail).
 
 ## OPEN QUESTIONS for the user
-- Is the Ledger **24-word seed phrase backed up offline**?
-- Supply stays on the **single Ledger address**, or move to a **multisig (Safe)**?
-- Is **Living Science Lab** a formed entity that should hold/issue the token (vs. personally)?
+- ~~Is the Ledger 24-word seed phrase backed up offline?~~ **CONFIRMED: yes, backed up offline (2026-06-06).**
+- ~~Supply stays on the single Ledger address, or move to a multisig (Safe)?~~ **DECIDED: single Ledger key (2026-06-06).**
+- Issuing entity: still to be decided with securities counsel. "Living Science Lab" is a brand/project name,
+  not a separate legal entity.
 
 ## Tooling locations (this machine)
 - Foundry (forge/cast/anvil): `~/.config/.foundry/bin/` (add to PATH)
