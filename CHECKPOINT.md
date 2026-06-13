@@ -1,6 +1,6 @@
 # CHECKPOINT — Living Science Token (LSL)
 
-_Saved 2026-06-06. Resume from the "NEXT ACTION" section._
+_Saved 2026-06-06; updated 2026-06-12 (LSLDisperse deployed to mainnet). Resume from the "NEXT ACTION" section._
 
 ## What this project is
 A fixed-supply ERC-20 token, **deployed to Ethereum mainnet**, signed by a **Ledger**
@@ -11,10 +11,15 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
 - Built on OpenZeppelin v5.6.1, Foundry.
 
 ## On-chain facts (mainnet)
-- Contract: **`0xe1Eb0f66a15b80f64CA252fbe0CA3087F74A9B08`** — Etherscan-verified.
+- LSL token: **`0xe1Eb0f66a15b80f64CA252fbe0CA3087F74A9B08`** — Etherscan-verified.
 - Deploy tx: `0xa67cb272e3be97dc4dcf667ae81deff9442915707ad214445ef2770d2b2f20e2`.
 - Deployer / holder of full 1,000,000 supply: Ledger **`0x7C9eF832417e63F805ccaAbD131741aceEB5Bc1a`**
   (Foundry default path `m/44'/60'/0'/0/0`).
+- **LSLDisperse** batch helper: **`0x2d6fEC5f0d3611Ec9BFe7b633bD180B49d17Fcdd`** (deployed 2026-06-12).
+  Deploy tx `0x9ecf3fb12ef8023c8cece1ed74491734fbb49081bba62593a7a765eca0094ade`, block 25305047,
+  235,364 gas. **Not yet Etherscan-verified** (deployed without `--verify` because the V1 API key
+  fails on Etherscan's V2 API — verify once a fresh V2 key is minted). Address is stored in `.env`
+  as `LSL_DISPERSE_ADDRESS`; set it as env `LSL_DISPERSE` for `DisperseBatch`.
 
 ## DONE ✅
 - [x] Contract `src/LivingScienceToken.sol` + tests (22 passing) + Slither (0 findings)
@@ -27,7 +32,10 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       (simulate-first, Ledger-signed); template `distribution.example.json`
 - [x] Single-batch distribution path: `src/LSLDisperse.sol` (stateless/ownerless atomic batch
       helper, 8 tests) + `script/DeployDisperse.s.sol` + `script/DisperseBatch.s.sol` + gated
-      `scripts/disperse.sh` — fans out in one tx (2 Ledger sigs total, not N). Not yet deployed.
+      `scripts/disperse.sh` — fans out in one tx (2 Ledger sigs total, not N).
+      **Deployed to mainnet 2026-06-12** at `0x2d6fEC5f0d3611Ec9BFe7b633bD180B49d17Fcdd`
+      (unverified — see on-chain facts). NOTE: deployed straight to mainnet without the usual
+      Sepolia rehearsal, at the user's explicit instruction.
 - [x] `LEGAL-TAX-CHECKLIST.md` — topics to take to securities counsel + tax pro
 
 ## NOT done / current frontier ⏳
@@ -37,6 +45,8 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       + entity + counsel review *before* moving any tokens.
 - [x] **Custody decided (2026-06-06): supply stays on the single Ledger key** — no Safe/multisig
       migration. Makes the offline seed-phrase backup the critical single point of failure.
+- [ ] **Verify LSLDisperse on Etherscan** — needs a fresh V2 API key (the old V1 key is rejected
+      by Etherscan's V2 API). One command once a key exists; deploy works fine unverified meanwhile.
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
