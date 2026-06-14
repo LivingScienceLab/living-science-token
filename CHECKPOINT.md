@@ -59,6 +59,15 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       **swept back to index 0** (fund-gas tx `0xbb9e5eda…6b317f`, sweep tx `0xd96b55db…85b1cb0d9`), so the
       full 1,000,000 supply is reconsolidated on index 0; a ~0.0000262 ETH gas dust remains on index 1
       (same seed, recoverable).
+- [x] **Full 100 LSL real-flow rehearsal on mainnet (2026-06-13)** — repeated the whole recipient pipeline
+      at production amount against index 1 (`0x0a78…C590`): fresh control-of-address signature
+      `cast wallet verify` ✅, **1 LSL** test transfer (tx `0xe91cc838…926d0f81`) confirmed received, then
+      **99 LSL** balance (tx `0x503f8bd2…7506ff1d`) → index 1 held 100 LSL, supply conserved. Then **swept
+      all 100 LSL back** to index 0 (tx `0x3c4960ad…057e78cd`; index 1 had enough leftover ETH dust to pay
+      gas, so no funding tx needed). Supply fully reconsolidated at 1,000,000 on index 0. Logged in
+      `~/lsl-legal/LSL-contributor-master-tracking.csv` (marked Internal-Test). Confirms the
+      sign→verify→test→balance→sweep flow works at real amounts; live distribution now only needs a real
+      verified recipient. Outreach draft template prepared in Gmail (100 LSL).
 - [ ] **Distribution to real recipients not started** — no `distribution.json` exists yet (only the example).
       The full supply sits on the single Ledger (index 0); nothing sold or traded externally.
 - [ ] **Legal/tax engagement open** — per `LEGAL-TAX-CHECKLIST.md`, decide distribution model
