@@ -1,6 +1,8 @@
 # CHECKPOINT — Living Science Token (LSL)
 
-_Saved 2026-06-06; updated 2026-06-13 (LSLDisperse + LSLAccessGate deployed to mainnet). Resume from the "NEXT ACTION" section._
+_Saved 2026-06-06; updated 2026-06-14 — **AccessGate milestone COMPLETE** (tag `accessgate-v1`): spend-to-access
+live on mainnet + SIWE-secured gatekeeper + reverse proxy + deployment kit + Node 24-ready CI. Resume from the
+"NEXT ACTION" section (remaining AccessGate work is ops/business, not code)._
 
 ## What this project is
 A fixed-supply ERC-20 token, **deployed to Ethereum mainnet**, signed by a **Ledger**
@@ -46,6 +48,16 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       `0x2d6fEC5f0d3611Ec9BFe7b633bD180B49d17Fcdd`. NOTE: deployed straight to mainnet without the
       usual Sepolia rehearsal, at the user's explicit instruction.
 - [x] `LEGAL-TAX-CHECKLIST.md` — topics to take to securities counsel + tax pro
+- [x] **AccessGate (spend-to-access) MILESTONE COMPLETE — 2026-06-14, tag `accessgate-v1`.** Fully built and
+      exercised live on mainnet: `LSLAccessGate` deployed + both access models configured (`research-access`
+      Subscription + `dataset-download` PerUse) + operator authorized/funded; live buy→consume→sink-routing
+      verified. Off-chain **SIWE-secured reverse-proxy gatekeeper** (`scripts/gatekeeper.mjs`) with stateless
+      HMAC sessions, `/nonce` rate-limiting, `/health`, ops CLI (`scripts/gate.sh`), and client
+      (`scripts/gate-login.mjs`). **Deployment kit**: `Dockerfile`, validating launcher
+      (`scripts/gatekeeper-run.sh`), Cloud Run config (`deploy/`), keyless CI→GHCR/Artifact Registry
+      (Node 24-ready). See the frontier section for the full breakdown. **What remains is ops + business
+      decisions only — no code**: stand up a host + TLS, point `gate-upstreams.json` at the real service,
+      finalize resource pricing, and the legal/tax track for token distribution.
 
 ## NOT done / current frontier ⏳
 - [x] **Distribution pipeline proven end-to-end on mainnet (2026-06-13, live self-test)** — used the
