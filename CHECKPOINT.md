@@ -190,6 +190,11 @@ currently wired to an Alchemy demo upstream. To monetize for real:
      (creates pool/provider/pusher-SA scoped to this repo, prints the repo Variables to set:
      `GCP_WIF_PROVIDER`/`GCP_DEPLOY_SA`/`GCP_PROJECT`/`GCP_AR_REGION`/`GCP_AR_REPO`). Until those vars are
      set, CI pushes GHCR only (AR steps skipped). Image still verified building+pushing green in CI.
+   - **CI is Node 24-ready (2026-06-14)**: ahead of GitHub's 2026-06-16 forced Node 20→24 migration, the
+     image workflow's actions were bumped to node24 majors (`setup-buildx-action@v4`, `login-action@v4`,
+     `metadata-action@v6`, `build-push-action@v7`, `google-github-actions/auth@v3`; `checkout@v6` already
+     node24). Verified: the post-bump run is green with the Node 20 deprecation annotation gone. `test.yml`
+     (foundry CI) was already clean — no change needed.
 4. Operator hot key `0x7a758A45972453D4E37A495C3244Ce9D83CC4518` is funded 0.001 ETH; top up as
    `consume()` volume grows.
 
