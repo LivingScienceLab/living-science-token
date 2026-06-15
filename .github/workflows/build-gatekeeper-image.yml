@@ -1,0 +1,73 @@
+name: Build gatekeeper image
+
+# Builds the AccessGate gatekeeper container and pushes it to GitHub Container Registry (ghcr.io).
+# Uses the built-in GITHUB_TOKEN — no extra secrets needed. Image:
+#   ghcr.io/<owner>/lsl-gatekeeper:{latest, <branch>, sha-<short>, <git-tag>}
+#
+# Triggers: pushes to main that touch the gatekeeper/Dockerfile, any version tag, or manual dispatch.
+# NOTE: GitHub applies the `paths` filter to tag pushes too, so a release tag on a commit that did NOT
+# touch these paths can be skipped. For a guaranteed build of a specific ref, use "Run workflow"
+# (workflow_dispatch) from that branch/tag in the Actions tab.
+#
+# First push to GHCR creates a private package; make it public (or grant pull access) under the org's
+# Packages settings if the image needs to be pulled without auth.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'scripts/gatekeeper.mjs'
+      - '.github/workflows/build-gatekeeper-image.yml'
+    tags:
+      - 'accessgate-*'
+      - 'v*'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build-push:
+    name: Build and push to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate gatekeeper syntax
+        run: node --check scripts/gatekeeper.mjs
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/lsl-gatekeeper
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -16,6 +16,9 @@ FROM ghcr.io/foundry-rs/foundry:latest AS foundry
 
 FROM node:22-slim
 ENV CAST=/usr/local/bin/cast PORT=8088 NODE_ENV=production
+# ca-certificates so `cast` can reach HTTPS RPC endpoints; curl is handy for ad-hoc probes.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=foundry /usr/local/bin/cast /usr/local/bin/cast
 WORKDIR /app
 # Only the gatekeeper code is baked in; config + secrets are mounted at runtime.
