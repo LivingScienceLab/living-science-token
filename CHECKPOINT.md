@@ -172,10 +172,10 @@ endpoint wired). Two open tracks remain, both gated on decisions/ops, NOT code:
   5,000 LSL → index 1 own-wallet run). What's missing is real verified recipients + sign-off.
 - Get **securities counsel + a crypto-literate tax pro** to clear the distribution MODEL (sale vs. reward,
   registration/exemption) before moving any LSL to third parties.
-- When cleared: `cp distribution.example.json distribution.json`, fill real recipients + whole-LSL amounts,
-  then **dry-run first** with the preferred single-batch path `scripts/disperse.sh mainnet` (simulates +
-  previews, then asks before the 2 Ledger-signed txs). Preserve every tx + date + FMV for tax
-  (`broadcast/` is the audit trail; the LSLDisperse run is already committed there).
+- When cleared: follow **`DISTRIBUTION-RUNBOOK.md`** — the full step-by-step (intake + proof-of-control →
+  build `distribution.json` → Ledger readiness → dry-run `scripts/disperse.sh mainnet` → broadcast →
+  verify + record FMV/tx for tax). Preserve every tx + date + FMV (`broadcast/` is the audit trail; the
+  first LSLDisperse run is already committed there).
 
 ### B. AccessGate productionization — gated on ops, NOT code
 The gate is live and the gatekeeper is built, SIWE-secured, and verified — but it is a reference template
