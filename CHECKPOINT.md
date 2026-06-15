@@ -150,18 +150,42 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
         VERIFY `cast wallet address` reads `0x7C9e…Bc1a` BEFORE signing. Always verify the address first.
 
 ## >>> NEXT ACTION <<<
-Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
-1. Engage a **securities attorney** + **crypto-literate tax pro**; decide the distribution model.
-2. When ready to move tokens: `cp distribution.example.json distribution.json`, fill in real
-   recipients + whole-LSL amounts, then **dry-run first**: `scripts/distribute.sh mainnet`
-   (it simulates against live state, prints a preview, and asks before any Ledger-signed broadcast).
-3. Preserve every distribution tx + date + FMV for tax records (`broadcast/` is the audit trail).
+All contract code + tooling is DONE and exercised live on mainnet — token, LSLDisperse (first 5,000 LSL
+batch run), and LSLAccessGate (both resources, operator, SIWE-secured reverse-proxy gatekeeper, real
+endpoint wired). Two open tracks remain, both gated on decisions/ops, NOT code:
+
+### A. Token distribution to EXTERNAL recipients — gated on legal/tax
+- Entity is formed: **Jensen Communications LLC** (DE, single-member) d/b/a "Living Science Lab"; the LLC
+  holds the 1,000,000 LSL via the single Ledger key (index 0). Disperse mechanics are proven live (the
+  5,000 LSL → index 1 own-wallet run). What's missing is real verified recipients + sign-off.
+- Get **securities counsel + a crypto-literate tax pro** to clear the distribution MODEL (sale vs. reward,
+  registration/exemption) before moving any LSL to third parties.
+- When cleared: `cp distribution.example.json distribution.json`, fill real recipients + whole-LSL amounts,
+  then **dry-run first** with the preferred single-batch path `scripts/disperse.sh mainnet` (simulates +
+  previews, then asks before the 2 Ledger-signed txs). Preserve every tx + date + FMV for tax
+  (`broadcast/` is the audit trail; the LSLDisperse run is already committed there).
+
+### B. AccessGate productionization — gated on ops, NOT code
+The gate is live and the gatekeeper is built, SIWE-secured, and verified — but it is a reference template
+currently wired to an Alchemy demo upstream. To monetize for real:
+1. **Wire the real gated service**: edit `gate-upstreams.json` (gitignored) to point each resource at the
+   actual endpoint (URL + headers/body). Today `research-access` → Alchemy `eth_blockNumber` (demo only).
+2. **Finalize catalog + pricing**: current resources are placeholders (research-access 50 LSL/30d,
+   dataset-download 10 LSL/use) — adjust via `setResource` (Ledger-signed) once real prices are decided.
+3. **Host it**: persist nonces/sessions (in-memory today), put behind TLS, set `GATE_DOMAIN` to the real
+   host, rate-limit `/nonce`. (Proof-of-control is already enforced via SIWE.)
+4. Operator hot key `0x7a758A45972453D4E37A495C3244Ce9D83CC4518` is funded 0.001 ETH; top up as
+   `consume()` volume grows.
+
+### Housekeeping
+- **index 0 ETH is ~0.0034** after the AccessGate session — top up before the next Ledger-signed work.
 
 ## OPEN QUESTIONS for the user
 - ~~Is the Ledger 24-word seed phrase backed up offline?~~ **CONFIRMED: yes, backed up offline (2026-06-06).**
 - ~~Supply stays on the single Ledger address, or move to a multisig (Safe)?~~ **DECIDED: single Ledger key (2026-06-06).**
-- Issuing entity: still to be decided with securities counsel. "Living Science Lab" is a brand/project name,
-  not a separate legal entity.
+- ~~Issuing entity: still to be decided.~~ **DECIDED (2026-06-13): Jensen Communications LLC** (DE,
+  single-member) d/b/a "Living Science Lab" (DBA registered); the LLC owns the 1,000,000 LSL via capital
+  contribution. Securities/tax review of the distribution *model* is still open (see NEXT ACTION track A).
 
 ## Tooling locations (this machine)
 - Foundry (forge/cast/anvil): `~/.config/.foundry/bin/` (add to PATH)
