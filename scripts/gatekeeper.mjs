@@ -16,31 +16,46 @@
 //   GET  /check?user=0x..&resource=<name>  -> { allow, model, credits, expiry }   PUBLIC read-only
 //        (on-chain state is public; no content served and no credit burned, so no auth needed)
 //
-// To make this real: replace serveContent() with your actual service, set GATE_DOMAIN to your
-// host, put it behind TLS, and persist nonces/sessions (this template keeps them in memory).
+// Production config (env, read from ../.env or the process env):
+//   GATE_DOMAIN          SIWE domain binding — set to your real host (anti-phishing).
+//   GATE_SESSION_SECRET  HMAC key for stateless session tokens — set a strong, stable value so
+//                        sessions survive restarts and validate across instances. Unset → random
+//                        per-boot secret (sessions drop on restart; a startup WARN is logged).
+//   NONCE_RATE_MAX       /nonce requests allowed per IP per minute (default 30).
+//   NETWORK              RPC alias/URL for chain reads (default mainnet).
+// Sessions are stateless (signed tokens), so no session store is needed; the single-use nonce map
+// is in-memory/per-instance — for multi-node, share it (e.g. Redis) and front /nonce with a WAF.
+// Still TODO for a real deployment: point gate-upstreams.json at your real service, and terminate TLS
+// (a reverse proxy / load balancer in front, or wrap this in https).
 //
 // Zero npm dependencies — Node http/crypto + child_process(cast). Reads config from ../.env.
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const env = Object.fromEntries(
-  readFileSync(join(ROOT, '.env'), 'utf8')
+// Config = optional .env file (dev) merged with process.env (containers/--env-file), env vars winning.
+const envPath = join(ROOT, '.env');
+const fileEnv = existsSync(envPath) ? Object.fromEntries(
+  readFileSync(envPath, 'utf8')
     .split('\n').filter(l => l && !l.startsWith('#') && l.includes('='))
     .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
-);
-const NET = process.env.NETWORK || 'mainnet';
+) : {};
+const env = { ...fileEnv, ...process.env };
+const NET = env.NETWORK || 'mainnet';
 const GATE = env.LSL_ACCESS_GATE_ADDRESS;
 const KS = env.OPERATOR_KEYSTORE, PW = env.OPERATOR_KEYSTORE_PW;
-const PORT = Number(process.env.PORT || 8088);
-const CAST = process.env.CAST || `${process.env.HOME}/.config/.foundry/bin/cast`;
-const DOMAIN = process.env.GATE_DOMAIN || `localhost:${PORT}`;     // SIWE domain binding (anti-phishing)
+const PORT = Number(env.PORT || 8088);
+const CAST = env.CAST || `${process.env.HOME}/.config/.foundry/bin/cast`;
+const DOMAIN = env.GATE_DOMAIN || `localhost:${PORT}`;            // SIWE domain binding (anti-phishing)
 const NONCE_TTL_MS = 10 * 60 * 1000;                              // 10 min to complete login
 const SESSION_TTL_MS = 60 * 60 * 1000;                            // 1 h session
+const SESSION_SECRET = env.GATE_SESSION_SECRET;                   // HMAC key for stateless tokens
+const RATE_MAX = Number(env.NONCE_RATE_MAX || 30);               // max /nonce requests per IP per window
+const RATE_WINDOW_MS = 60 * 1000;
 if (!GATE) { console.error('LSL_ACCESS_GATE_ADDRESS missing from .env'); process.exit(1); }
 
 // Per-resource upstream config (gitignored — may hold API keys). Shape:
@@ -77,10 +92,31 @@ function consumeOne(user, id) {                                   // operator re
 }
 
 /* ------------------------------ SIWE auth ------------------------------- */
-const nonces = new Map();                                         // nonce -> expiry(ms)
-const sessions = new Map();                                       // token -> { address, expiry }
+const nonces = new Map();                                         // nonce -> expiry(ms) (single-use; in-memory)
+// Stateless sessions: an HMAC-signed token {a:address, e:expiry}. Survives restarts (with a stable
+// GATE_SESSION_SECRET) and needs no server-side session store, so it scales horizontally — set the
+// SAME GATE_SESSION_SECRET on every node. (The `nonces` map is still per-instance; for multi-node use
+// a shared store like Redis so a nonce issued by one node is single-use across all.)
+const SECRET = SESSION_SECRET
+  ? Buffer.from(SESSION_SECRET)
+  : (console.warn('WARN: GATE_SESSION_SECRET unset — using a random per-boot secret (sessions drop on restart). Set it for persistence/multi-node.'), randomBytes(32));
+function mintToken(address) {
+  const payload = Buffer.from(JSON.stringify({ a: address, e: Date.now() + SESSION_TTL_MS })).toString('base64url');
+  const sig = createHmac('sha256', SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+function tokenAddress(token) {                                    // -> address or null
+  const [payload, sig] = String(token).split('.');
+  if (!payload || !sig) return null;
+  const want = createHmac('sha256', SECRET).update(payload).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(want);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;   // forged/edited token
+  let p; try { p = JSON.parse(Buffer.from(payload, 'base64url').toString()); } catch { return null; }
+  return p && Date.now() <= p.e ? p.a : null;                    // null if expired
+}
 
 function newNonce() {
+  if (nonces.size > 10000) for (const [k, e] of nonces) if (Date.now() > e) nonces.delete(k); // opportunistic prune
   const n = randomBytes(16).toString('hex');
   nonces.set(n, Date.now() + NONCE_TTL_MS);
   return n;
@@ -109,17 +145,11 @@ function login(message, signature) {
   if (Date.now() > exp) throw httpErr(401, 'nonce expired');
   if (expiration && Date.now() > Date.parse(expiration)) throw httpErr(401, 'SIWE message expired');
   if (!verifySig(address, message, signature)) throw httpErr(401, 'signature does not match address');
-  const token = randomBytes(24).toString('hex');
-  sessions.set(token, { address, expiry: Date.now() + SESSION_TTL_MS });
-  return { token, address, expiresInSec: SESSION_TTL_MS / 1000 };
+  return { token: mintToken(address), address, expiresInSec: SESSION_TTL_MS / 1000 };
 }
 function authedAddress(req) {                                     // -> address or null
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
-  if (!m) return null;
-  const s = sessions.get(m[1]);
-  if (!s) return null;
-  if (Date.now() > s.expiry) { sessions.delete(m[1]); return null; }
-  return s.address;
+  return m ? tokenAddress(m[1]) : null;
 }
 
 /* ------------------------------- service -------------------------------- */
@@ -147,6 +177,14 @@ async function deliver(user, resource) {
 }
 
 /* -------------------------------- http ---------------------------------- */
+// Simple fixed-window per-IP rate limiter for /nonce (in-memory; per-instance — front a shared
+// limiter / WAF for multi-node). Caps anonymous nonce minting to blunt abuse.
+const rate = new Map();                                          // ip -> { n, win }
+function rateLimited(ip) {
+  const now = Date.now(), r = rate.get(ip);
+  if (!r || now - r.win > RATE_WINDOW_MS) { rate.set(ip, { n: 1, win: now }); return false; }
+  return ++r.n > RATE_MAX;
+}
 const isAddr = s => /^0x[0-9a-fA-F]{40}$/.test(s || '');
 const httpErr = (code, msg) => Object.assign(new Error(msg), { code });
 const send = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj, null, 2)); };
@@ -159,7 +197,11 @@ const readBody = req => new Promise((resolve, reject) => {
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   try {
+    if (req.method === 'GET' && url.pathname === '/health') {      // for load-balancer / Cloud Run probes
+      return send(res, 200, { status: 'ok', gate: GATE, net: NET, domain: DOMAIN });
+    }
     if (req.method === 'GET' && url.pathname === '/nonce') {
+      if (rateLimited(req.socket.remoteAddress || 'unknown')) throw httpErr(429, 'too many nonce requests; slow down');
       return send(res, 200, { nonce: newNonce(), domain: DOMAIN, ttlSec: NONCE_TTL_MS / 1000 });
     }
     if (req.method === 'POST' && url.pathname === '/login') {
@@ -196,6 +238,7 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log(`LSL gatekeeper (REFERENCE, SIWE) on :${PORT}  gate=${GATE}  net=${NET}  domain=${DOMAIN}`);
+  console.log(`  sessions: stateless HMAC${SESSION_SECRET ? ' (fixed secret)' : ' (random per-boot — set GATE_SESSION_SECRET)'} · /nonce rate-limit: ${RATE_MAX}/IP/min`);
   console.log(`  GET /nonce -> POST /login {message,signature} -> POST /serve?resource=.. (Bearer token)`);
   console.log(`  GET /check?user=0x..&resource=..  (public)`);
 });

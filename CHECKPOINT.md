@@ -172,8 +172,13 @@ currently wired to an Alchemy demo upstream. To monetize for real:
    actual endpoint (URL + headers/body). Today `research-access` → Alchemy `eth_blockNumber` (demo only).
 2. **Finalize catalog + pricing**: current resources are placeholders (research-access 50 LSL/30d,
    dataset-download 10 LSL/use) — adjust via `setResource` (Ledger-signed) once real prices are decided.
-3. **Host it**: persist nonces/sessions (in-memory today), put behind TLS, set `GATE_DOMAIN` to the real
-   host, rate-limit `/nonce`. (Proof-of-control is already enforced via SIWE.)
+3. **Host it — deployment kit is DONE** (see `DEPLOY-GATEKEEPER.md`): stateless HMAC session tokens
+   (`GATE_SESSION_SECRET`, generated into `.env`), `/nonce` rate-limiting (`NONCE_RATE_MAX`), a `/health`
+   probe, container-friendly config (merges `.env` + env vars), `Dockerfile` (bundles `cast`), and a
+   validating launcher `scripts/gatekeeper-run.sh` (refuses to start in prod without a real `GATE_DOMAIN` +
+   secret). All tested. **What's left is pure ops, no code**: stand up a host/Cloud Run, set `GATE_DOMAIN`
+   to the real host, terminate **TLS** in front (LB or Caddy), and for multi-node share the single-use
+   nonce store (e.g. Redis). Proof-of-control already enforced via SIWE.
 4. Operator hot key `0x7a758A45972453D4E37A495C3244Ce9D83CC4518` is funded 0.001 ETH; top up as
    `consume()` volume grows.
 
