@@ -26,3 +26,9 @@ docs/
 
 # Real distribution config (keep recipient lists out of git)
 distribution.json
+
+# Operator hot-wallet keystore (NEVER commit)
+.secrets/
+
+# Real upstream config (may hold upstream API keys)
+gate-upstreams.json

@@ -1,0 +1,19 @@
+{
+  "_comment": "Copy to gate-upstreams.json (gitignored) and set your real upstream per resource. On a valid /serve the gatekeeper proxies to `url` with `method`, your `headers` (e.g. an upstream API key), an optional fixed `body` (string or JSON object — e.g. a JSON-RPC call), plus injected X-LSL-User / X-LSL-Resource, and relays the response verbatim. `timeoutMs` optional (default 15000). Omit a resource to fall back to the placeholder.",
+  "research-access": {
+    "url": "https://api.livingsciencelab.org/research",
+    "method": "GET",
+    "headers": { "Authorization": "Bearer REPLACE_WITH_UPSTREAM_API_KEY" },
+    "timeoutMs": 15000
+  },
+  "dataset-download": {
+    "url": "https://files.livingsciencelab.org/datasets/latest",
+    "method": "GET"
+  },
+  "_example_post_with_body": {
+    "url": "https://rpc.example.org/v2/KEY",
+    "method": "POST",
+    "headers": { "content-type": "application/json" },
+    "body": { "id": 1, "jsonrpc": "2.0", "method": "eth_blockNumber" }
+  }
+}

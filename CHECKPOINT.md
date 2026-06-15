@@ -68,8 +68,18 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       `~/lsl-legal/LSL-contributor-master-tracking.csv` (marked Internal-Test). Confirms the
       sign→verify→test→balance→sweep flow works at real amounts; live distribution now only needs a real
       verified recipient. Outreach draft template prepared in Gmail (100 LSL).
-- [ ] **Distribution to real recipients not started** — no `distribution.json` exists yet (only the example).
-      The full supply sits on the single Ledger (index 0); nothing sold or traded externally.
+- [x] **First live LSLDisperse batch on mainnet (2026-06-14)** — exercised the deployed disperse helper
+      end-to-end at production scale: **5,000 LSL** sent from index 0 → index 1 (`0x0a78…C590`) in one
+      batch. approve tx `0x7af500d13539b0463897aba9e6c6c6a595b11667a3b4cf9ed1051cd6dc278824` (block
+      25318476); disperse tx `0x63e71d7c4822e5f3468274f6445f2c672d2e044d83c4055546d754f28b09415d` (block
+      25318486); allowance returned to 0. **NOT swept back** — index 1 (same seed) now holds 5,000 LSL,
+      index 0 holds 995,000; total supply unchanged. Own-wallet transfer, NOT a contributor distribution;
+      logged in `~/lsl-legal/LSL-contributor-master-tracking.csv` (bucket `Own-wallet`). Ledger/Crostini fix
+      that unblocked it: share USB into the container + `sudo chown $USER /dev/bus/usb/<BUS>/<DEV>` (reverts
+      on re-plug/lock).
+- [ ] **Distribution to real (external) recipients not started** — `distribution.json` is back to the
+      placeholder template. The bulk of supply (995,000 LSL) sits on the single Ledger index 0; nothing
+      sold or traded to third parties.
 - [ ] **Legal/tax engagement open** — per `LEGAL-TAX-CHECKLIST.md`, decide distribution model
       + entity + counsel review *before* moving any tokens.
 - [x] **Custody decided (2026-06-06): supply stays on the single Ledger key** — no Safe/multisig
@@ -90,6 +100,54 @@ hardware wallet via **Alchemy** RPC, with source on **GitHub (private)**.
       `.env` as `LSL_ACCESS_GATE_ADDRESS`. First resource configured 2026-06-13: **`research-access`** =
       Subscription, 50 LSL / 30 days, active. Add/update more via `setResource`; `sink`/`treasury` are
       runtime-changeable via `setSink`.
+- [x] **AccessGate fully set up + exercised live on mainnet (2026-06-14)** — both access models now
+      configured and proven end-to-end:
+      - Second resource added: **`dataset-download`** = **PerUse, 10 LSL/use**, active
+        (`setResource` tx `0xdb4fb3d75bdaf1a123995f865bf1b95e4c10895d0ed37bd0809f3ef1702d44d8`).
+      - **Operator authorized + funded**: hot key **`0x7a758A45972453D4E37A495C3244Ce9D83CC4518`**
+        (`setOperator` tx `0xa3b86c3a982d4d6f59be9ba6f8ec5a267f939060709dc38e5be4e9aebc56cdf9`; funded
+        0.001 ETH for `consume` gas). Encrypted keystore in `.secrets/` (gitignored); pw + address in
+        `.env` as `OPERATOR_*`. Blast radius is tiny — `consume()` can only decrement credits, never move
+        funds/sink/treasury.
+      - **Live test from index 1** (`0x0a78…C590`, the 5,000-LSL buyer): bought research-access (1 period,
+        50 LSL) → `hasAccess=true`; bought dataset-download (2 credits, 20 LSL); operator consumed credits
+        down to 0 (incl. one via the gatekeeper `/serve` path). Sink routing confirmed: the **70 LSL flowed
+        buyer → gate → treasury (index 0)**, so index 0 = 995,070 LSL, index 1 = 4,930 LSL, gate holds 0
+        (no custody). totalSupply unchanged.
+      - **Off-chain tooling added**: `scripts/gate.sh` (ops CLI: status/resource/quote/access/buy/consume/id,
+        string-id encoding via `cast format-bytes32-string`, NOT keccak256) and `scripts/gatekeeper.mjs`
+        (zero-dep reference middleware fronting the real service: Subscription serves free, PerUse redeems a
+        credit via the operator; **placeholder payload — wire your real endpoint in**).
+      - **SIWE proof-of-control added to the gatekeeper (2026-06-14)** — closes the spoof hole where anyone
+        could `/serve?user=<victim>` and spend/ride their access. Flow: `GET /nonce` (single-use, 10-min TTL)
+        → `POST /login {message,signature}` verifies the EIP-4361 message via `cast wallet verify` (+ domain
+        binding, nonce + expiry checks) and issues a 1-h session token → `POST /serve` requires a Bearer token
+        and derives the user from the SESSION, never a param. `GET /check` stays public (read-only on-chain
+        state). Reference client + CLI: `scripts/gate-login.mjs` (`--key 0x..` or `--ledger N`). Tested green:
+        valid login 200; no-token / replayed-nonce / tampered-sig / wrong-domain all 401; session-with-no-access
+        402. Also verified LIVE with the real Ledger: index 1 signed the SIWE message on-device → session →
+        `POST /serve research-access` returned 200 (active subscription, no credit burned). NOTE:
+        nonces/sessions are in-memory (fine for a template; persist them for production).
+      - **Reverse-proxy wiring added (2026-06-14)** — `/serve` now forwards an authorized request to a
+        per-resource upstream from **`gate-upstreams.json`** (gitignored; template `gate-upstreams.example.json`),
+        injecting the upstream's own auth headers + `X-LSL-User`/`X-LSL-Resource`, and relays the response
+        verbatim (binary-safe). For PerUse it **burns the credit only AFTER the upstream returns <400**, so a
+        failing upstream never costs a credit (upstream error → 502, no consume). Upstream URL comes from
+        trusted server config, not user input (no SSRF). Verified end-to-end on a local **anvil mainnet fork**
+        (no Ledger): software buyer purchased research-access on the fork → SIWE login → `/serve` returned the
+        upstream's payload with `delivered_to`/`for_resource`/`upstream_auth_seen` all correct. **To go live:
+        `cp gate-upstreams.example.json gate-upstreams.json`, set the real URL(s) + API key(s).**
+      - **`deliver()` extended with optional `body` support + wired to a real endpoint (2026-06-14)** — upstream
+        config now accepts a fixed request `body` (string or JSON object) for POST/JSON-RPC upstreams.
+        `gate-upstreams.json` (gitignored — holds the Alchemy key) wires **`research-access` → Alchemy mainnet
+        RPC** (`POST` JSON-RPC `eth_blockNumber`). Verified end-to-end on an anvil fork: SIWE-authed software
+        buyer → `/serve research-access` returned the SAME live response as a direct curl
+        (`{"jsonrpc":"2.0","id":1,"result":"0x182582e"}`), confirming the gatekeeper forwards method+headers+body
+        and relays the real upstream response. Swap the `url`/`body` in `gate-upstreams.json` to point at the
+        actual gated service.
+      - **Ledger/Crostini gotcha hit again**: had TWO Ledgers plugged in → `cast` derived the WRONG wallet
+        (`0x2C9b…`); fix was unplug the extra device + re-`chown` the re-enumerated `/dev/bus/usb` node, then
+        VERIFY `cast wallet address` reads `0x7C9e…Bc1a` BEFORE signing. Always verify the address first.
 
 ## >>> NEXT ACTION <<<
 Distribution is gated on legal/tax, not on code. The tooling is ready; the blocker is decisions.
