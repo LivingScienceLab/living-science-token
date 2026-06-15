@@ -179,6 +179,12 @@ currently wired to an Alchemy demo upstream. To monetize for real:
    secret). All tested. **What's left is pure ops, no code**: stand up a host/Cloud Run, set `GATE_DOMAIN`
    to the real host, terminate **TLS** in front (LB or Caddy), and for multi-node share the single-use
    nonce store (e.g. Redis). Proof-of-control already enforced via SIWE.
+   - **Turnkey GCP deploy added**: `deploy/cloudrun-deploy.sh` (build→Artifact Registry via Cloud Build,
+     push local secrets→Secret Manager, least-priv runtime SA, `gcloud run deploy` with env + mounted
+     secrets, pinned to 1 instance) and a declarative `deploy/cloudrun-gatekeeper.yaml`. Gatekeeper gained
+     a `GATE_UPSTREAMS_FILE` override (for mounted-secret upstream config) and a `.dockerignore`. Run:
+     `PROJECT_ID=… GATE_DOMAIN=… deploy/cloudrun-deploy.sh`, then map the domain for TLS. NOT run here
+     (needs your GCP project/auth) — set the real `gate-upstreams.json` first.
 4. Operator hot key `0x7a758A45972453D4E37A495C3244Ce9D83CC4518` is funded 0.001 ETH; top up as
    `consume()` volume grows.
 

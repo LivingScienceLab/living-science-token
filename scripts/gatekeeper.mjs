@@ -61,9 +61,11 @@ if (!GATE) { console.error('LSL_ACCESS_GATE_ADDRESS missing from .env'); process
 // Per-resource upstream config (gitignored — may hold API keys). Shape:
 //   { "research-access": { "url": "https://api.example.org/x", "method": "GET",
 //                          "headers": {"Authorization": "Bearer ..."}, "timeoutMs": 15000 } }
-// A resource with no entry falls back to a labeled placeholder payload.
-const UPSTREAMS = existsSync(join(ROOT, 'gate-upstreams.json'))
-  ? JSON.parse(readFileSync(join(ROOT, 'gate-upstreams.json'), 'utf8')) : {};
+// A resource with no entry falls back to a labeled placeholder payload. Path defaults to
+// <root>/gate-upstreams.json; override with GATE_UPSTREAMS_FILE (e.g. a mounted secret on Cloud Run).
+const UPSTREAMS_FILE = env.GATE_UPSTREAMS_FILE || join(ROOT, 'gate-upstreams.json');
+const UPSTREAMS = existsSync(UPSTREAMS_FILE)
+  ? JSON.parse(readFileSync(UPSTREAMS_FILE, 'utf8')) : {};
 
 /* ---------------------------- on-chain reads ---------------------------- */
 // Right-pad a <=31-char string to bytes32 — matches `cast format-bytes32-string` (NOT keccak256).

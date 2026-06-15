@@ -49,6 +49,30 @@ docker run -p 8088:8088 --env-file .env \
 On Cloud Run / similar: push the image, set the env vars, mount the keystore as a secret, and let the
 platform terminate TLS and route to `$PORT`.
 
+### Cloud Run (GCP) — one command
+`deploy/cloudrun-deploy.sh` does it end to end: builds the image to Artifact Registry (Cloud Build),
+pushes your local secrets (`.env` values, operator keystore, `gate-upstreams.json`) to Secret Manager,
+creates a least-privilege runtime service account, and deploys the service with env + mounted secrets.
+```
+gcloud auth login
+PROJECT_ID=my-proj GATE_DOMAIN=gate.livingsciencelab.org deploy/cloudrun-deploy.sh
+```
+Then map your domain so SIWE domain binding matches clients (Cloud Run provides TLS for the mapped domain):
+```
+gcloud run domain-mappings create --service lsl-gatekeeper --domain gate.livingsciencelab.org --region us-central1
+```
+Notes:
+- **Set `gate-upstreams.json` to your real service first** — it's pushed verbatim into the `gate-upstreams`
+  secret (currently the Alchemy demo).
+- `NETWORK` is set to the **full RPC URL** (from `MAINNET_RPC_URL`) because the image has no `foundry.toml`
+  to resolve the `mainnet` alias.
+- **Pinned to one instance** (`--max-instances 1`): single-use nonces are in-memory/per-instance. To scale
+  out, move nonces to a shared store (Redis/Memorystore) and raise the cap. Sessions are stateless already.
+- Deployed `--allow-unauthenticated` by default (a gatekeeper is public-facing and enforces its **own**
+  SIWE auth); set `ALLOW_UNAUTH=0` to require IAM/IAP in front instead.
+- Declarative alternative: edit and apply `deploy/cloudrun-gatekeeper.yaml` with
+  `gcloud run services replace`.
+
 ## TLS
 The gatekeeper speaks plain HTTP — **always** put TLS in front. Either a platform LB (Cloud Run, ALB) or a
 reverse proxy. Minimal Caddy (automatic HTTPS):

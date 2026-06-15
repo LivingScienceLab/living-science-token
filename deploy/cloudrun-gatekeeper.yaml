@@ -1,0 +1,86 @@
+# Cloud Run service spec for the LSL AccessGate gatekeeper.
+# Apply with:  gcloud run services replace deploy/cloudrun-gatekeeper.yaml --region REGION
+# Prereqs (see deploy/cloudrun-deploy.sh, which automates all of this):
+#   - Image pushed to Artifact Registry (Cloud Run can't pull private GHCR directly).
+#   - Secret Manager secrets created: gate-session-secret, gate-rpc-url, gate-operator-pw,
+#     gate-operator-keystore, gate-upstreams.
+#   - A runtime service account with roles/secretmanager.secretAccessor on those secrets.
+# Replace every <PLACEHOLDER>.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: lsl-gatekeeper
+  labels:
+    app: lsl-gatekeeper
+spec:
+  template:
+    metadata:
+      annotations:
+        # In-memory single-use nonces are per-instance, so pin to ONE instance. To scale out,
+        # move nonces to a shared store (Redis/Memorystore) and raise maxScale. Sessions are
+        # stateless (HMAC) and already work across instances.
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '1'
+        run.googleapis.com/sessionAffinity: 'true'
+        run.googleapis.com/startup-cpu-boost: 'true'
+    spec:
+      serviceAccountName: <RUNTIME_SA>@<PROJECT_ID>.iam.gserviceaccount.com
+      containerConcurrency: 40
+      timeoutSeconds: 300
+      containers:
+        - image: <REGION>-docker.pkg.dev/<PROJECT_ID>/<AR_REPO>/lsl-gatekeeper:latest
+          ports:
+            - name: http1
+              containerPort: 8080          # Cloud Run injects $PORT=8080; gatekeeper reads env.PORT
+          env:
+            - name: LSL_ACCESS_GATE_ADDRESS
+              value: '0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5'
+            - name: GATE_DOMAIN
+              value: '<gate.your-domain.org>'   # your real host — SIWE domain binding
+            - name: NONCE_RATE_MAX
+              value: '30'
+            - name: OPERATOR_KEYSTORE
+              value: '/secrets/operator/keystore.json'
+            - name: GATE_UPSTREAMS_FILE
+              value: '/secrets/upstreams/gate-upstreams.json'
+            - name: GATE_SESSION_SECRET
+              valueFrom:
+                secretKeyRef: { name: gate-session-secret, key: latest }
+            - name: NETWORK                  # full RPC URL (no foundry.toml in the image to resolve aliases)
+              valueFrom:
+                secretKeyRef: { name: gate-rpc-url, key: latest }
+            - name: OPERATOR_KEYSTORE_PW
+              valueFrom:
+                secretKeyRef: { name: gate-operator-pw, key: latest }
+          volumeMounts:
+            - name: operator
+              mountPath: /secrets/operator
+            - name: upstreams
+              mountPath: /secrets/upstreams
+          resources:
+            limits:
+              cpu: '1'
+              memory: 512Mi
+          startupProbe:
+            httpGet: { path: /health, port: 8080 }
+            failureThreshold: 10
+            periodSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 30
+      volumes:
+        - name: operator
+          secret:
+            secretName: gate-operator-keystore
+            items:
+              - key: latest
+                path: keystore.json
+        - name: upstreams
+          secret:
+            secretName: gate-upstreams
+            items:
+              - key: latest
+                path: gate-upstreams.json
+  traffic:
+    - percent: 100
+      latestRevision: true

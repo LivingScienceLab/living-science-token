@@ -1,0 +1,16 @@
+# Keep the Docker / Cloud Build context small and secret-free. The image only COPYs
+# scripts/gatekeeper.mjs, so everything heavy or sensitive is excluded from the upload.
+.git
+lib
+out
+cache
+broadcast
+docs
+.github
+.secrets
+.env
+.env.*
+gate-upstreams.json
+distribution.json
+node_modules
+*.log
