@@ -185,6 +185,11 @@ currently wired to an Alchemy demo upstream. To monetize for real:
      a `GATE_UPSTREAMS_FILE` override (for mounted-secret upstream config) and a `.dockerignore`. Run:
      `PROJECT_ID=… GATE_DOMAIN=… deploy/cloudrun-deploy.sh`, then map the domain for TLS. NOT run here
      (needs your GCP project/auth) — set the real `gate-upstreams.json` first.
+   - **Keyless CI → Artifact Registry**: the image workflow now ALSO pushes to GCP Artifact Registry via
+     Workload Identity Federation (no SA keys) when configured. One-time setup `deploy/setup-wif.sh`
+     (creates pool/provider/pusher-SA scoped to this repo, prints the repo Variables to set:
+     `GCP_WIF_PROVIDER`/`GCP_DEPLOY_SA`/`GCP_PROJECT`/`GCP_AR_REGION`/`GCP_AR_REPO`). Until those vars are
+     set, CI pushes GHCR only (AR steps skipped). Image still verified building+pushing green in CI.
 4. Operator hot key `0x7a758A45972453D4E37A495C3244Ce9D83CC4518` is funded 0.001 ETH; top up as
    `consume()` volume grows.
 

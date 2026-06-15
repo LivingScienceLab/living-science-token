@@ -73,6 +73,18 @@ Notes:
 - Declarative alternative: edit and apply `deploy/cloudrun-gatekeeper.yaml` with
   `gcloud run services replace`.
 
+### Auto-publish the image to Artifact Registry (keyless CI)
+So the CI build lands the image in GCP automatically (no Cloud Build step in the deploy), wire up
+Workload Identity Federation once — no service-account keys:
+```
+PROJECT_ID=my-proj GITHUB_REPO=LivingScienceLab/living-science-token deploy/setup-wif.sh
+# then set the printed GitHub repo Variables (GCP_WIF_PROVIDER, GCP_DEPLOY_SA, GCP_PROJECT,
+# GCP_AR_REGION, GCP_AR_REPO)
+```
+After that, every gatekeeper/Dockerfile change on `main` (and version tags) pushes the image to both
+GHCR **and** `…-docker.pkg.dev/<project>/<repo>/lsl-gatekeeper`. Point the Cloud Run deploy at that
+AR image (it's the same tag the deploy script builds).
+
 ## TLS
 The gatekeeper speaks plain HTTP — **always** put TLS in front. Either a platform LB (Cloud Run, ALB) or a
 reverse proxy. Minimal Caddy (automatic HTTPS):

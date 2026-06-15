@@ -1,16 +1,22 @@
 name: Build gatekeeper image
 
-# Builds the AccessGate gatekeeper container and pushes it to GitHub Container Registry (ghcr.io).
-# Uses the built-in GITHUB_TOKEN — no extra secrets needed. Image:
-#   ghcr.io/<owner>/lsl-gatekeeper:{latest, <branch>, sha-<short>, <git-tag>}
+# Builds the AccessGate gatekeeper container and pushes it to GitHub Container Registry (ghcr.io),
+# and — when GCP Workload Identity Federation is configured — ALSO to Google Artifact Registry so
+# Cloud Run can pull it directly. No service-account keys: auth uses GitHub's OIDC token via WIF.
 #
-# Triggers: pushes to main that touch the gatekeeper/Dockerfile, any version tag, or manual dispatch.
+# Enable the Artifact Registry push (one time): run `deploy/setup-wif.sh`, then set these repo
+# Variables (Settings → Secrets and variables → Actions → Variables) — all non-secret identifiers:
+#   GCP_WIF_PROVIDER  projects/NUM/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+#   GCP_DEPLOY_SA     image-pusher service-account email
+#   GCP_PROJECT       project id
+#   GCP_AR_REGION     e.g. us-central1
+#   GCP_AR_REPO       Artifact Registry repo (e.g. lsl)
+# If GCP_WIF_PROVIDER is unset, the AR steps are skipped and only GHCR is pushed.
+#
 # NOTE: GitHub applies the `paths` filter to tag pushes too, so a release tag on a commit that did NOT
 # touch these paths can be skipped. For a guaranteed build of a specific ref, use "Run workflow"
-# (workflow_dispatch) from that branch/tag in the Actions tab.
-#
-# First push to GHCR creates a private package; make it public (or grant pull access) under the org's
-# Packages settings if the image needs to be pulled without auth.
+# (workflow_dispatch). First GHCR push creates a private package — make it public / grant pull access
+# in the org Packages settings if it must be pulled without auth.
 on:
   push:
     branches: [main]
@@ -27,11 +33,12 @@ permissions: {}
 
 jobs:
   build-push:
-    name: Build and push to GHCR
+    name: Build and push
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write          # required for GCP Workload Identity Federation
     steps:
       - uses: actions/checkout@v6
         with:
@@ -50,11 +57,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate to GCP (Workload Identity Federation)
+        id: gcpauth
+        if: vars.GCP_WIF_PROVIDER != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        if: vars.GCP_WIF_PROVIDER != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.GCP_AR_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcpauth.outputs.access_token }}
+
+      - name: Compute image list (GHCR always; Artifact Registry when configured)
+        id: images
+        run: |
+          {
+            echo 'list<<EOF'
+            echo "ghcr.io/${{ github.repository_owner }}/lsl-gatekeeper"
+            if [ -n "${{ vars.GCP_WIF_PROVIDER }}" ]; then
+              echo "${{ vars.GCP_AR_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/${{ vars.GCP_AR_REPO }}/lsl-gatekeeper"
+            fi
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       - name: Image metadata (tags + labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/lsl-gatekeeper
+          images: ${{ steps.images.outputs.list }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
