@@ -27,8 +27,18 @@ docs/
 # Real distribution config (keep recipient lists out of git)
 distribution.json
 
+# Generated preflight artifacts
+# execution-map.md may embed recipient addresses from distribution.json
+execution-map.md
+deploy-map.md
+
 # Operator hot-wallet keystore (NEVER commit)
 .secrets/
 
 # Real upstream config (may hold upstream API keys)
 gate-upstreams.json
+ops-logs/
+
+# Python bytecode (e.g. from the vendored asset-service)
+__pycache__/
+*.pyc

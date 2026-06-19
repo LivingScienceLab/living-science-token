@@ -1,5 +1,5 @@
-# Keep the Docker / Cloud Build context small and secret-free. The image only COPYs
-# scripts/gatekeeper.mjs, so everything heavy or sensitive is excluded from the upload.
+# Keep the Docker / Cloud Build context small and secret-free. The image COPYs
+# scripts/gatekeeper.mjs + asset-service/; everything heavy or sensitive is excluded from the upload.
 .git
 lib
 out
@@ -14,3 +14,6 @@ gate-upstreams.json
 distribution.json
 node_modules
 *.log
+# Python bytecode (never bake stale pyc into the image)
+__pycache__/
+*.pyc

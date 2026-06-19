@@ -1,0 +1,6 @@
+Sample ID,Reading Celsius,Notes
+exp-001, 21.4 ,baseline
+exp-002, 22.9 , slight drift
+exp-003, 20.1 ,
+exp-004, , missing reading
+exp-005, 23.7 ,within range

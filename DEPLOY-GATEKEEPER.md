@@ -5,6 +5,13 @@ caller (SIWE), checks on-chain access against the deployed `LSLAccessGate`
 (`0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5`), and — for an authorized request — reverse-proxies to your
 real service. The contract is the source of truth for payment/entitlement; this process enforces it.
 
+**Combined image:** the `research-access` resource serves the Living Science Lab **IP asset** (dataset +
+provenance manifest) produced by `~/living-science-lab` (the `asset-service/`). The Docker image bundles
+**both** the gatekeeper and that Python asset service and runs them together (the gatekeeper proxies to the
+asset service over loopback `127.0.0.1:8090`); only the gatekeeper port is exposed. The asset service is
+vendored under `asset-service/` from `living-science-lab` (the source of truth) via
+`scripts/sync-asset-service.sh` — re-run it and rebuild after changing the pipeline there.
+
 ## Prerequisites
 - The `LSLAccessGate` is live on mainnet with your resources configured (`scripts/gate.sh resource <id>`).
 - An **operator** keystore (for PerUse `consume`) funded with a little ETH — already set up in `.secrets/`.
@@ -31,13 +38,18 @@ Wire your real service per resource in **`gate-upstreams.json`** (gitignored; se
 
 ### Bare (a VM / box with foundry installed)
 ```
+# research-access serves the IP asset, so start the asset service too (loopback) — else /serve 502s:
+( cd asset-service && ASSET_OUT_DIR=/tmp/lsl-asset-out python3 serve.py & )   # 127.0.0.1:8090
 scripts/gatekeeper-run.sh        # validates GATE_SESSION_SECRET + a real GATE_DOMAIN, then runs
 # local testing only: ALLOW_INSECURE=1 scripts/gatekeeper-run.sh
 ```
-Use a process manager (systemd / pm2) to keep it up and restart on crash.
+Run **both** processes under a process manager (systemd / pm2), or just use the combined Docker image
+below, which supervises both for you. The asset service must NOT be exposed publicly — bind it to loopback
+(its default) and let only the gatekeeper reach it.
 
 ### Docker
 ```
+scripts/sync-asset-service.sh    # vendor the latest asset service from ~/living-science-lab
 docker build -t lsl-gatekeeper .
 docker run -p 8088:8088 --env-file .env \
   -e GATE_DOMAIN=gate.example.org \
@@ -62,8 +74,9 @@ Then map your domain so SIWE domain binding matches clients (Cloud Run provides 
 gcloud run domain-mappings create --service lsl-gatekeeper --domain gate.livingsciencelab.org --region us-central1
 ```
 Notes:
-- **Set `gate-upstreams.json` to your real service first** — it's pushed verbatim into the `gate-upstreams`
-  secret (currently the Alchemy demo).
+- `gate-upstreams.json` is pushed verbatim into the `gate-upstreams` secret; `research-access` already
+  points at the bundled asset service (`http://127.0.0.1:8090/asset`). Run `scripts/sync-asset-service.sh`
+  before building so the image carries the latest `asset-service/`.
 - `NETWORK` is set to the **full RPC URL** (from `MAINNET_RPC_URL`) because the image has no `foundry.toml`
   to resolve the `mainnet` alias.
 - **Pinned to one instance** (`--max-instances 1`): single-use nonces are in-memory/per-instance. To scale
