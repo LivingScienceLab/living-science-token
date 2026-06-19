@@ -1,8 +1,11 @@
-name: Build gatekeeper image
+name: Build & publish combined image
 
-# Builds the AccessGate gatekeeper container and pushes it to GitHub Container Registry (ghcr.io),
-# and — when GCP Workload Identity Federation is configured — ALSO to Google Artifact Registry so
-# Cloud Run can pull it directly. No service-account keys: auth uses GitHub's OIDC token via WIF.
+# Builds the COMBINED container (Node gatekeeper + Python IP-asset service), SMOKE-TESTS it (starts
+# the container and asserts BOTH halves come up), and only then pushes it to GitHub Container
+# Registry (ghcr.io) — and, when GCP Workload Identity Federation is configured, ALSO to Google
+# Artifact Registry so Cloud Run can pull it directly. No service-account keys: auth uses GitHub's
+# OIDC token via WIF. Publishing is GATED on the smoke test (`needs: smoke-test`), so a broken image
+# never ships :latest. On pull_request the smoke test runs but publishing is skipped.
 #
 # Enable the Artifact Registry push (one time): run `deploy/setup-wif.sh`, then set these repo
 # Variables (Settings → Secrets and variables → Actions → Variables) — all non-secret identifiers:
@@ -23,17 +26,86 @@ on:
     paths:
       - 'Dockerfile'
       - 'scripts/gatekeeper.mjs'
+      - 'deploy/entrypoint.sh'
+      - 'asset-service/**'
       - '.github/workflows/build-gatekeeper-image.yml'
     tags:
       - 'accessgate-*'
       - 'v*'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'scripts/gatekeeper.mjs'
+      - 'deploy/entrypoint.sh'
+      - 'asset-service/**'
+      - '.github/workflows/build-gatekeeper-image.yml'
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
+  smoke-test:
+    name: Build + smoke-test combined image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate sources (node / python / shell)
+        run: |
+          node --check scripts/gatekeeper.mjs
+          python3 -m py_compile asset-service/serve.py asset-service/src/lsl_pipeline/*.py
+          sh -n deploy/entrypoint.sh
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build combined image (load locally, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: lsl-combined:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test — both services come up
+        run: |
+          set -euo pipefail
+          # Minimal runtime config: the gatekeeper requires LSL_ACCESS_GATE_ADDRESS (the real, public
+          # mainnet gate). /health needs no RPC, so no network/secrets are involved.
+          docker run -d --name lsl -p 8088:8088 \
+            -e LSL_ACCESS_GATE_ADDRESS=0x14c129b8D22491a2cCE9Be36137eC8d9B9b31Db5 \
+            -e GATE_SESSION_SECRET=ci-smoke \
+            lsl-combined:ci
+
+          echo "waiting for gatekeeper /health on :8088 ..."
+          up=0
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8088/health >/dev/null; then up=1; break; fi
+            sleep 1
+          done
+          if [ "$up" != 1 ]; then
+            echo "::error::gatekeeper /health never came up"; docker logs lsl; docker rm -f lsl; exit 1
+          fi
+          echo "gatekeeper: $(curl -s http://127.0.0.1:8088/health)"
+
+          # The asset service binds container-loopback :8090 (never published). Probe it from INSIDE
+          # the container using the node runtime that's already present.
+          echo "checking asset service /health on container loopback :8090 ..."
+          docker exec lsl node -e "fetch('http://127.0.0.1:8090/health').then(r=>r.ok?r.text():Promise.reject('status '+r.status)).then(t=>console.log('asset:',t)).catch(e=>{console.error('asset service down:',e);process.exit(1)})"
+
+          docker rm -f lsl
+          echo "✅ combined image builds and both services start"
+
   build-push:
     name: Build and push
+    needs: smoke-test
+    if: github.event_name != 'pull_request'   # never publish from a PR
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,9 +115,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-
-      - name: Validate gatekeeper syntax
-        run: node --check scripts/gatekeeper.mjs
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
