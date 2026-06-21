@@ -104,8 +104,13 @@ double-send). It holds no funds and has no privileged roles — it mirrors LSL's
 ## Dependencies
 
 OpenZeppelin and forge-std are git submodules under `lib/` (see `.gitmodules`), mapped via
-`remappings.txt`. After a fresh clone run `git submodule update --init --recursive` (or
-`forge install`) or builds will fail with missing imports. Pinned to OpenZeppelin v5.6.1.
+`remappings.txt`. After a fresh clone run `git submodule update --init` (or `forge install`)
+or builds will fail with missing imports. Pinned to OpenZeppelin v5.6.1.
+
+Do **not** init recursively. OpenZeppelin pins its own dev-only nested submodules
+(`erc4626-tests`, `halmos-cheatcodes`, a nested `forge-std`) which LSL never builds or tests
+against; `--recursive` only pulls that dead weight. CI uses `submodules: true` for the same
+reason. The non-recursive init still fetches OZ's full `contracts/` source, so builds work.
 
 ## Secrets & deployment flow
 
